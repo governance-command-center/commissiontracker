@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function profile() { return get(/databases/$(database)/documents/commissionUsers/$(request.auth.uid)).data; }
+    function member() { return request.auth != null && profile().active == true && profile().role in ['admin','pic','viewer']; }
+    function editor(region) { return member() && (profile().role == 'admin' || (profile().role == 'pic' && region in profile().regions)); }
+    match /commissionUsers/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      // Provision profiles through the Firebase console, not the public client.
+      allow list, create, update, delete: if false;
+    }
+    match /commissionEvents/{eventId} {
+      allow read: if member();
+      allow create: if editor(request.resource.data.region)
+        && request.resource.data.keys().hasOnly(['region','patch','changes','batchId','id','seq','inputAt','inputDate','effectiveDate','by','uid','reference','reason','mode','source','uploadScope','missing','createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.by == profile().name
+        && request.resource.data.region in ['SG','MY','PH','TH','VN','ID']
+        && request.resource.data.patch.region == request.resource.data.region
+        && request.resource.data.patch.channel in ['Lazada','Shopee','TikTok Shop']
+        && request.resource.data.patch.cats is list
+        && request.resource.data.patch.cats.size() > 0
+        && request.resource.data.patch.cats.size() <= 20
+        && request.resource.data.patch.fees is map
+        && request.resource.data.changes is list
+        && request.resource.data.missing is list
+        && request.resource.data.reason is string && request.resource.data.reason.size() > 0
+        && request.resource.data.reference is string
+        && request.resource.data.effectiveDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.inputDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.seq is int
+        && request.resource.data.seq == getAfter(/databases/$(database)/documents/commissionMeta/revision).data.value
+        && request.resource.data.batchId == getAfter(/databases/$(database)/documents/commissionMeta/revision).data.batchId
+        && getAfter(/databases/$(database)/documents/commissionMeta/revision).data.updatedAt == request.time
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /commissionMeta/revision {
+      allow read: if member();
+      function paired() {
+        let event = getAfter(/databases/$(database)/documents/commissionEvents/$(request.resource.data.eventId)).data;
+        return request.resource.data.keys().hasOnly(['value','updatedAt','batchId','eventId'])
+          && request.resource.data.value is int
+          && request.resource.data.updatedAt == request.time
+          && event.seq == request.resource.data.value
+          && event.batchId == request.resource.data.batchId
+          && event.createdAt == request.time
+          && event.uid == request.auth.uid
+          && editor(event.region);
+      }
+      allow create: if member() && request.resource.data.value == 1 && paired();
+      allow update: if member() && request.resource.data.value == resource.data.value + 1 && paired();
+      allow delete: if false;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
