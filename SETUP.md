@@ -18,11 +18,17 @@ Firestore → Data → Start collection:
 - Document ID: paste your Authentication UID (do not use auto-ID).
 - Fields:
   - `name`: string, your display name (required)
+  - `email`: string, your Authentication email (required)
   - `active`: boolean, true
   - `role`: string, `admin`
   - `regions`: array of strings, `SG`, `MY`, `PH`, `TH`, `VN`, `ID`
 
-For a PIC, create another document using their own UID, with `role` = `pic` and `regions` = an array containing only their assigned regions, e.g. `PH`. For read-only access use `role` = `viewer`, `active` = true and an empty `regions` array. Set `active` = false to disable data access. Client accounts cannot edit their own access profile.
+After your first admin account is ready, use **Members → Add member** inside the tracker. Enter name, email, role and regions. Optionally set an initial password; otherwise click **Send password setup email** after account creation. The setup email is sent only when you click its action.
+
+Members → Edit access changes role, regions and Active/Disabled status. Disabled members lose permission to read/write tracker data; their Authentication login remains in Firebase. Admins cannot disable or demote themselves. Passwords cannot be viewed. The first admin still requires this one-time console setup.
+
+If you already created a PIC login in Authentication, use **Add member → Add an existing Firebase login**, with its exact UID and email. Client accounts without an active approved member profile cannot access data.
+
 
 ## 4. Publish with Firebase Hosting
 The repository stores the app under `dist/`; no build step is needed. Firebase Hosting is supplied because it works with a private GitHub repository without making the repository public.
@@ -59,3 +65,8 @@ The command prints the live URL. Do not deploy Firestore rules through the CLI u
 
 ## Remaining roadmap
 Final regional headers/workbook baseline; last verified vs last updated; region/platform verification overview; column visibility; actionable summary cards; activity-feed filters; later impact analysis and reminders.
+
+## Members pilot checks
+Sign in as admin and add a disposable PIC. Confirm admin stays signed in, the new member receives the intended region access, and password reset works. Verify Viewer/PIC accounts cannot list members or write profiles directly. Disable the PIC and confirm reads/writes are denied immediately; re-enable to restore access. Self-disable and self-demotion must be rejected. Account creation and profile saving span two Firebase services: if the profile write fails, the app attempts to remove the just-created login and reports recovery details if cleanup fails.
+
+This approach uses standard client email/password account registration in a separate in-memory Auth instance and admin-only Firestore access approval. It does not require Cloud Functions or a Blaze upgrade. Account creation endpoints still accept registration attempts, but unapproved accounts have no tracker data access. Existing-login UID/email matching is an administrator responsibility. Do not disable the Firebase client sign-up API if you want in-tool Add member to work.

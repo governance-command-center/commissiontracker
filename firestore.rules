@@ -3,11 +3,17 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function profile() { return get(/databases/$(database)/documents/commissionUsers/$(request.auth.uid)).data; }
     function member() { return request.auth != null && profile().active == true && profile().role in ['admin','pic','viewer']; }
+    function admin() { return member() && profile().role == 'admin'; }
+    function validProfile() { return request.resource.data.keys().hasOnly(['name','email','role','regions','active','createdAt','updatedAt','updatedBy']) && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100 && request.resource.data.email is string && request.resource.data.role in ['admin','pic','viewer'] && request.resource.data.regions is list && request.resource.data.regions.hasOnly(['SG','MY','PH','TH','VN','ID']) && (request.resource.data.role != 'pic' || request.resource.data.regions.size() > 0) && request.resource.data.active is bool && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time; }
     function editor(region) { return member() && (profile().role == 'admin' || (profile().role == 'pic' && region in profile().regions)); }
     match /commissionUsers/{uid} {
-      allow get: if request.auth != null && request.auth.uid == uid;
-      // Provision profiles through the Firebase console, not the public client.
-      allow list, create, update, delete: if false;
+      allow get: if request.auth != null && (request.auth.uid == uid || admin());
+      allow list: if admin();
+      allow create: if admin() && validProfile() && request.resource.data.createdAt == request.time;
+      allow update: if admin() && validProfile()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['email','createdAt'])
+        && (request.auth.uid != uid || (request.resource.data.role == 'admin' && request.resource.data.active == true));
+      allow delete: if false;
     }
     match /commissionEvents/{eventId} {
       allow read: if member();
