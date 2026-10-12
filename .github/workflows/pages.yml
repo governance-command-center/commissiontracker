@@ -20,7 +20,7 @@ jobs:
       - name: Package frontend only
         run: |
           mkdir -p pages-artifact
-          cp index.html app.js cloud.js style.css engine.js baseline.js firebase-config.js xlsx.full.min.js pages-artifact/
+          cp index.html app.js browser-auth.js cloud.js style.css engine.js baseline.js firebase-config.js xlsx.full.min.js pages-artifact/
       - uses: actions/upload-pages-artifact@v4
         with:
           path: pages-artifact

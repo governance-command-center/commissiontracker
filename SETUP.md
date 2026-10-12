@@ -1,84 +1,57 @@
-# Commission Tracker — username-only deployment
+# Commission Tracker — basic browser login, like Checklist / GovernanceHub
 
-Firebase project: `commissiontracker-9c35b`. No email addresses, email providers or email password-reset messages are used by this version. Administrators create usernames and passwords in Members.
+This version follows the requested basic browser-side username/password model. Root `index.html`, JavaScript and CSS are hosted statically; shared data uses Firebase Firestore. No member email addresses or email messages, Cloud Functions, Blaze upgrade or manual Firebase user creation are needed.
 
-## Deployment requirement — review first
-This version uses Firebase Cloud Functions for secure password checking and Firebase custom-token signing. Deploying Cloud Functions requires the **Blaze (pay-as-you-go) plan**. The previous Spark-compatible email/password version has been replaced in source, but no billing settings or live Firebase deployment have been changed. Do not upgrade without reviewing pricing. If you want to stay strictly on Spark, this backend cannot be deployed as supplied.
+## Access limitation
+The initial admin credential is visible in `browser-auth.js`. Password checks and member roles are enforced only by browser code and can be bypassed. Firebase Anonymous authentication establishes a connection, but does not prove that someone is an approved PIC/admin. Anyone who obtains an anonymous session can read or write the four pilot collections directly, including changing member access. Member passwords use salted PBKDF2 hashes instead of plaintext; this does not fix the authorization limitation. Use this only with data whose exposure or alteration you can accept under this model.
 
-## 1. Prepare Firebase
-- Authentication: open Get started once to initialize the service if needed. No sign-in provider needs to be enabled for custom-token sign-in. Email/Password can be disabled after deployment; do not enable Google sign-in for this tool.
-- Firestore Database: create the default database, Standard edition, Production mode, preferably Singapore `asia-southeast1`.
-- Only after agreeing to its cost model, upgrade the project to Blaze. Configure a billing budget alert. Alerts notify; they do not impose a spending cap.
+The four isolated pilot collections are `commissionPilotUsers`, `commissionPilotCredentials`, `commissionPilotEvents`, `commissionPilotMeta`. Older secure-backend collections stay closed. Rates start empty; no original workbook is bundled.
 
-## 2. Deploy the repository
-Install Node.js 22 and download/unzip the latest repository from GitHub → Code → Download ZIP. Open a terminal in the directory containing `firebase.json`:
+## 1. Firebase setup
+1. Authentication → Sign-in method → Add new provider → **Anonymous** → Enable → Save. This requires no emails or manually created Firebase users.
+2. Firestore Database → Create database → Standard → default database → Production mode. Choose Singapore (`asia-southeast1`) if offered.
+3. Firestore → Rules: copy all of `firestore.rules` from the repository and Publish. Review the access limitation above first. The rules only open the four pilot collections to anonymous sessions; they do not open the entire database.
 
+Email/Password and Google sign-in are not used by this version and can remain disabled.
+
+## 2. GitHub Pages
+The repository is currently private. Your screenshot shows that Pages is unavailable until you upgrade GitHub or make the repository public. Making it public exposes its source and commit history; that is a separate choice. No visibility change has been made automatically.
+
+If you choose a public repository, change Settings → General → Danger Zone → Change repository visibility → Public. Then:
+1. Settings → Pages → Source → **GitHub Actions**.
+2. Actions → **Deploy frontend to GitHub Pages** → Run workflow → main.
+3. Wait until the workflow succeeds. Return to Settings → Pages and use **Visit site**. Do not assume a URL is live before deployment succeeds.
+
+The workflow publishes only the frontend files, not tests, backend archives or setup documents. No Cloud Functions deployment is required.
+
+## Alternative: keep the repository private
+Use Firebase Hosting instead of GitHub Pages. With Node.js installed, download/unzip the repository and open a terminal in its folder:
 ```sh
 npm install -g firebase-tools
 firebase login
 firebase use commissiontracker-9c35b
-npm --prefix functions install
-firebase functions:secrets:set COMMISSION_BOOTSTRAP_KEY
+firebase deploy --only hosting
 ```
-The last command prompts privately for a setup key. Choose a unique random value with at least 32 characters and keep it privately in a password manager. Do not put it in JavaScript, GitHub, or chat. You will enter it once in the tool's first-admin setup screen.
+The CLI returns the live Hosting URL. Keep the Firebase rules and Anonymous provider configured as above.
 
-Then deploy:
-```sh
-firebase deploy --only firestore:rules,functions,hosting
-```
-The CLI prints the Hosting URL. Use that returned URL; source upload alone does not publish the app. Backend region is `asia-southeast1`.
+## 3. First admin login
+Initial username: `admin`
+Initial password: `commission-admin-2026`
 
-### If custom-token signing reports a permission error
-The runtime service account needs `iam.serviceAccounts.signBlob`. Enable the IAM Service Account Credentials API, then grant **Service Account Token Creator** to the deployed functions' runtime service account on that same service account. For the default second-generation runtime in this project, this is typically `409114803837-compute@developer.gserviceaccount.com`; confirm the actual runtime identity in Cloud Functions/Cloud Run before applying permissions. Use the Firebase custom-token documentation linked below. Do not download or embed service-account private keys.
+This is a publicly visible starter credential, not a secret. On first login the app requires you to change it. The new hash is stored in Firestore and replaces the starter credential; the source starter password no longer works after initialization. The model still allows direct database bypass, as explained above.
 
-## 3. Create your first admin inside the tool
-1. Open the deployed Hosting URL.
-2. Click **First admin setup**.
-3. Enter your display name, chosen admin username, password (12–128 characters) and private setup key.
-4. Submit. The backend creates the first administrator once and signs you in.
-5. Keep your credentials and setup key privately. No default/shared admin password is provided.
+## 4. Members
+Admin → Members → Add member: name, username, initial password, role, regions, status. Share the credentials directly yourself. The member changes their initial password on first login. Use Edit access to enable/disable or change regions. Use Reset password to give a temporary password. Old browser sessions will be asked to log in again. All these role/session restrictions are UI behavior, not database-enforced security.
 
-The first-admin action is protected by the deployment secret and a transaction-backed one-time lock. It cannot create a second initial administrator. An email-based admin from an earlier version does not count as a username account; legacy credentials are not migrated automatically.
+## 5. Pilot checks
+- Admin initialization happens once; change its password and confirm the starter no longer works.
+- Add a PH PIC and verify their initial password change and PH-only edit UI.
+- Save a small test commission and confirm another browser/device sees it.
+- Two concurrent previews should reject the stale save.
+- Verify disable/reset triggers a new login in an open member browser.
+- Validate bulk templates, category IDs, future dates and blank/N/A/[CLEAR] behavior.
 
-## 4. Add PICs from Members
-- **Add member**: display name, username, initial password, role, assigned regions and status.
-- Share the username and initial password directly with the member yourself.
-- On first login they must replace the initial password before viewing rates.
-- **Edit access**: change role, region assignment, or Active/Disabled status.
-- **Reset password**: set a temporary password; share it yourself. Old sessions lose commission-data access immediately and the member must change it on next login.
-- **Change password** in the header changes your own password and refreshes your session.
-- You cannot disable or demote your own admin account. Create another trusted admin if you need recovery assistance.
+Local logic and password-hashing tests passed. Live Firebase and Pages testing remains pending your console configuration and hosting choice.
 
-Usernames are case-insensitive, 3–32 characters, using letters, numbers, dot, dash or underscore. Usernames cannot be renamed in this version. Passwords never appear in the Members table or backup exports.
-
-## 5. Verify before inviting real PICs
-- Create the first admin twice; only the first request should succeed.
-- Add a disposable PH PIC; confirm the admin stays signed in and no emails are requested or sent.
-- Log in on another device; confirm the initial password must be changed.
-- PH PIC can view all regions but only update PH. Viewer can only view. PIC/Viewer cannot list members or call member-management endpoints.
-- Reset the test member's password while they are logged in. Old sessions must lose access. Their new temporary password should require another password change.
-- Disable the account; login and data access should fail. Re-enable to restore access.
-- Save a rate update and verify visibility in another browser. Two concurrent previews must reject the stale save.
-- Try future effective dates, bulk category IDs, blank/unchanged values, N/A and [CLEAR].
-
-## Storage, recovery and limits
-- Credential hashes and per-user salts are stored in `commissionCredentials`; client Firestore reads/writes are denied. Password hashing uses scrypt. Passwords are verified on the server, never in browser code.
-- Member profiles in `commissionUsers` contain only display name, username, role, regions, status, timestamps, credential version and required-password-change flag. Only server endpoints write profiles.
-- Login attempts are rate-limited per IP per 15-minute window; this is basic protection and not an enterprise identity service. Expired limiter documents can be cleaned periodically. Optionally configure Firestore TTL on `commissionLoginLimits.expiresAt`; review its billing first.
-- Password reset changes a credential version checked by both server endpoints and Firestore rules. Direct client writes cannot grant membership or admin rights.
-- Commission history remains append-only, with transaction-based stale-preview protection and regional edit permissions.
-- The shared rate baseline starts empty. Import only PIC-confirmed workbooks. Old browser-local data and email-based logins are not automatically imported.
-- If every admin loses their password, recovery requires privileged server/console assistance. The bootstrap lock must not be deleted as an ordinary reset procedure.
-- Local crypto, backend-handler and client logic tests passed. Firebase services were not deployed or tested live; run the pilot checks above before rollout.
-
-References: https://firebase.google.com/docs/auth/admin/create-custom-tokens and https://firebase.google.com/docs/functions/get-started
-
-## Remaining roadmap
-Final regional headers/baseline; verified dates/status overview; additional table controls; activity-feed filters; later impact analysis/reminders.
-
-## Familiar GitHub layout and Pages
-The frontend now uses root `index.html` plus adjacent JS/CSS files, matching the Checklist and GovernanceHub repositories. Firebase Hosting can serve the same root files; its ignore list excludes the backend, tests and setup documents.
-
-For GitHub Pages, repository Settings → Pages must be enabled separately. A private repository requires a GitHub plan that supports Pages for private repositories. Do not make the repository public as a workaround without deciding to expose the source. If available, choose GitHub Actions and use the supplied **Deploy frontend to GitHub Pages** workflow under Actions → Run workflow. It packages only frontend assets and keeps backend files out of the published artifact.
-
-GitHub Pages hosts the frontend only. It cannot run `functions/`. Username login, first-admin setup and member management still require the secure backend deployment described above. Enabling Pages alone produces a login screen, not a working shared tracker. No change has been made to Checklist/GovernanceHub or their Firebase projects.
+## Deferred work
+PIC-confirmed regional headers/baseline; verification dates/status matrix; table controls; feed filters; later impact analysis/reminders. Secure authorization requires replacing this browser-side model later.

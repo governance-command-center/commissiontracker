@@ -12,7 +12,8 @@
       "*.cjs",
       "functions/**",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "browser-auth-test.cjs"
     ],
     "headers": [
       {
@@ -25,8 +26,5 @@
         ]
       }
     ]
-  },
-  "functions": {
-    "source": "functions"
   }
 }
