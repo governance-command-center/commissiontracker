@@ -1,13 +1,18 @@
 # Channel Commission & Fees
 
-A regional PIC commission tracker with quick category edits, bulk Excel updates, new-category templates, change history, effective dates and Excel exports.
+A regional PIC commission tracker with quick category edits, bulk Excel updates, new-category templates, change history, effective dates and exports.
 
-Admin-only Members tab: add members, optional initial password, password setup/reset email, role/region assignment and enable/disable tool access. First admin is provisioned once in Firebase Console.
+**Username/password only.** No member email addresses or email reset messages. Admin-only Members supports account creation, role/region assignment, enable/disable access and temporary password resets. Members must change administrator-provided passwords before accessing rates. The first admin is created inside the tool using a private deployment setup key.
 
-Shared pilot: Firebase Authentication (email/password), Firestore event history, regional edit permissions and transaction-based protection against stale previews. All approved users can view; assigned PICs edit their own regions; Governance admins can import master workbooks. Firebase project `commissiontracker-9c35b` is configured.
+Firebase custom authentication uses a secure Cloud Functions backend, salted scrypt password hashes, private credentials, session-version checks and basic login rate limiting. Firestore controls shared records and regional edit permissions. This version requires Blaze for backend deployment; no billing change or deployment has been made.
 
-**Start with [SETUP.md](SETUP.md).** The app is not live on Firebase until Authentication, Firestore, access profiles and Hosting are set up. Rate records start empty; Governance will import the PIC-confirmed baseline.
+**Read [SETUP.md](SETUP.md)** before deployment. Frontend files are in `dist/`; backend files are in `functions/`. The shared baseline starts empty pending PIC confirmation.
 
-App files: `dist/`. No frontend build required. Run `node test.cjs` and `node cloud-test.cjs` for logic checks. Firestore rules are in `firestore.rules`; client tests do not replace live access-rule validation.
-
-Next: verified dates/status overview, standardized regional baselines, additional table controls and feed filters. Existing browser-local updates remain in the old Sites version and are not silently migrated.
+Tests:
+```sh
+node test.cjs
+node cloud-test.cjs
+node functions/security-test.cjs
+node functions/handlers-test.cjs
+```
+The tests include real hashing and mocked Firebase handler/transaction flows. They do not substitute for deployed Firebase authentication and security-rule testing.

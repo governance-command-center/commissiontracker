@@ -1,72 +1,77 @@
-# Commission Tracker — shared PIC pilot setup
+# Commission Tracker — username-only deployment
 
-Firebase project: `commissiontracker-9c35b`. GitHub repository: `governance-command-center/commissiontracker`.
+Firebase project: `commissiontracker-9c35b`. No email addresses, email providers or email password-reset messages are used by this version. Administrators create usernames and passwords in Members.
 
-## 1. Enable sign-in
-Firebase Console → Build → Authentication → Get started → Sign-in method → Email/Password → Enable → Save.
+## Deployment requirement — review first
+This version uses Firebase Cloud Functions for secure password checking and Firebase custom-token signing. Deploying Cloud Functions requires the **Blaze (pay-as-you-go) plan**. The previous Spark-compatible email/password version has been replaced in source, but no billing settings or live Firebase deployment have been changed. Do not upgrade without reviewing pricing. If you want to stay strictly on Spark, this backend cannot be deployed as supplied.
 
-Authentication → Users → Add user. Create your administrator account first, then each PIC account. Each account uses their own email and password. Copy the user's UID. Use the app's Reset password button to let PICs choose their own password.
+## 1. Prepare Firebase
+- Authentication: open Get started once to initialize the service if needed. No sign-in provider needs to be enabled for custom-token sign-in. Email/Password can be disabled after deployment; do not enable Google sign-in for this tool.
+- Firestore Database: create the default database, Standard edition, Production mode, preferably Singapore `asia-southeast1`.
+- Only after agreeing to its cost model, upgrade the project to Blaze. Configure a billing budget alert. Alerts notify; they do not impose a spending cap.
 
-## 2. Create the database
-Build → Firestore Database → Create database → **Standard edition**, default database. Choose Singapore (`asia-southeast1`) if offered, then **Production mode**. Keep Spark plan for the initial pilot. Database location cannot be changed later.
+## 2. Deploy the repository
+Install Node.js 22 and download/unzip the latest repository from GitHub → Code → Download ZIP. Open a terminal in the directory containing `firebase.json`:
 
-Firestore → Rules: replace the editor content with the entire `firestore.rules` file in this repository → Publish. Do not enable open test-mode rules.
-
-## 3. Assign your admin access
-Firestore → Data → Start collection:
-- Collection ID: `commissionUsers`
-- Document ID: paste your Authentication UID (do not use auto-ID).
-- Fields:
-  - `name`: string, your display name (required)
-  - `email`: string, your Authentication email (required)
-  - `active`: boolean, true
-  - `role`: string, `admin`
-  - `regions`: array of strings, `SG`, `MY`, `PH`, `TH`, `VN`, `ID`
-
-After your first admin account is ready, use **Members → Add member** inside the tracker. Enter name, email, role and regions. Optionally set an initial password; otherwise click **Send password setup email** after account creation. The setup email is sent only when you click its action.
-
-Members → Edit access changes role, regions and Active/Disabled status. Disabled members lose permission to read/write tracker data; their Authentication login remains in Firebase. Admins cannot disable or demote themselves. Passwords cannot be viewed. The first admin still requires this one-time console setup.
-
-If you already created a PIC login in Authentication, use **Add member → Add an existing Firebase login**, with its exact UID and email. Client accounts without an active approved member profile cannot access data.
-
-
-## 4. Publish with Firebase Hosting
-The repository stores the app under `dist/`; no build step is needed. Firebase Hosting is supplied because it works with a private GitHub repository without making the repository public.
-
-On a computer with Node.js:
 ```sh
 npm install -g firebase-tools
 firebase login
-```
-Download this repository using GitHub → Code → Download ZIP, unzip it, open a terminal in the folder that contains `firebase.json`, then:
-```sh
 firebase use commissiontracker-9c35b
-firebase deploy --only hosting
+npm --prefix functions install
+firebase functions:secrets:set COMMISSION_BOOTSTRAP_KEY
 ```
-The command prints the live URL. Do not deploy Firestore rules through the CLI until you have reviewed them; the console instructions above are sufficient. `firebase deploy --only firestore:rules` is an alternative for deploying the supplied rules.
+The last command prompts privately for a setup key. Choose a unique random value with at least 32 characters and keep it privately in a password manager. Do not put it in JavaScript, GitHub, or chat. You will enter it once in the tool's first-admin setup screen.
 
-## 5. Verify before inviting PICs
-- Sign in as admin. Confirm shared connection and the empty baseline. Import the PIC-confirmed workbook or use Add categories for a test category.
-- Sign in with a separate PH PIC account in another browser/device. Verify that all regions can be viewed, but only PH can be edited.
-- Create a small PH update. Confirm it appears on the admin device and remains after refresh.
-- Preview the same change on both devices, save one, then confirm the other. The stale preview should be rejected and require a new preview.
-- Try a future effective date. It should appear in activity/history immediately and affect Current rates only when the effective date arrives.
-- Set a user's `active` field to false; confirm the app blocks access.
-- Check bulk-template category IDs, blank/unchanged cells, N/A, [CLEAR], and duplicate category rejection.
+Then deploy:
+```sh
+firebase deploy --only firestore:rules,functions,hosting
+```
+The CLI prints the Hosting URL. Use that returned URL; source upload alone does not publish the app. Backend region is `asia-southeast1`.
 
-## Data and rollout notes
-- Firebase configuration is a public web app identifier. Access is controlled by Authentication and Firestore rules.
-- Shared changes are stored as immutable category events. Every save uses a transaction and revision check. Different users cannot replace the entire history.
-- Updater name and UID come from the authenticated profile. Accounts must have a nonempty `name` field.
-- Previous browser-local updates are not auto-imported. Keep the old Sites version's JSON backup. Controlled migration can be added after baseline confirmation.
-- Shared version starts with empty rate records. Regional fee headers are retained as preliminary schemas. The old provisional rates and source workbook were excluded. Import the PIC-confirmed baseline through the authenticated admin UI; stored rates will then be restricted to approved users.
-- There is no shared destructive restore button. Backup downloads shared event history; recovery is an admin process.
-- Client logic checks passed; deployed Firebase rules, sign-in and two-device sync still require the live checks above because Firebase Console access was not provided.
+### If custom-token signing reports a permission error
+The runtime service account needs `iam.serviceAccounts.signBlob`. Enable the IAM Service Account Credentials API, then grant **Service Account Token Creator** to the deployed functions' runtime service account on that same service account. For the default second-generation runtime in this project, this is typically `409114803837-compute@developer.gserviceaccount.com`; confirm the actual runtime identity in Cloud Functions/Cloud Run before applying permissions. Use the Firebase custom-token documentation linked below. Do not download or embed service-account private keys.
+
+## 3. Create your first admin inside the tool
+1. Open the deployed Hosting URL.
+2. Click **First admin setup**.
+3. Enter your display name, chosen admin username, password (12–128 characters) and private setup key.
+4. Submit. The backend creates the first administrator once and signs you in.
+5. Keep your credentials and setup key privately. No default/shared admin password is provided.
+
+The first-admin action is protected by the deployment secret and a transaction-backed one-time lock. It cannot create a second initial administrator. An email-based admin from an earlier version does not count as a username account; legacy credentials are not migrated automatically.
+
+## 4. Add PICs from Members
+- **Add member**: display name, username, initial password, role, assigned regions and status.
+- Share the username and initial password directly with the member yourself.
+- On first login they must replace the initial password before viewing rates.
+- **Edit access**: change role, region assignment, or Active/Disabled status.
+- **Reset password**: set a temporary password; share it yourself. Old sessions lose commission-data access immediately and the member must change it on next login.
+- **Change password** in the header changes your own password and refreshes your session.
+- You cannot disable or demote your own admin account. Create another trusted admin if you need recovery assistance.
+
+Usernames are case-insensitive, 3–32 characters, using letters, numbers, dot, dash or underscore. Usernames cannot be renamed in this version. Passwords never appear in the Members table or backup exports.
+
+## 5. Verify before inviting real PICs
+- Create the first admin twice; only the first request should succeed.
+- Add a disposable PH PIC; confirm the admin stays signed in and no emails are requested or sent.
+- Log in on another device; confirm the initial password must be changed.
+- PH PIC can view all regions but only update PH. Viewer can only view. PIC/Viewer cannot list members or call member-management endpoints.
+- Reset the test member's password while they are logged in. Old sessions must lose access. Their new temporary password should require another password change.
+- Disable the account; login and data access should fail. Re-enable to restore access.
+- Save a rate update and verify visibility in another browser. Two concurrent previews must reject the stale save.
+- Try future effective dates, bulk category IDs, blank/unchanged values, N/A and [CLEAR].
+
+## Storage, recovery and limits
+- Credential hashes and per-user salts are stored in `commissionCredentials`; client Firestore reads/writes are denied. Password hashing uses scrypt. Passwords are verified on the server, never in browser code.
+- Member profiles in `commissionUsers` contain only display name, username, role, regions, status, timestamps, credential version and required-password-change flag. Only server endpoints write profiles.
+- Login attempts are rate-limited per IP per 15-minute window; this is basic protection and not an enterprise identity service. Expired limiter documents can be cleaned periodically. Optionally configure Firestore TTL on `commissionLoginLimits.expiresAt`; review its billing first.
+- Password reset changes a credential version checked by both server endpoints and Firestore rules. Direct client writes cannot grant membership or admin rights.
+- Commission history remains append-only, with transaction-based stale-preview protection and regional edit permissions.
+- The shared rate baseline starts empty. Import only PIC-confirmed workbooks. Old browser-local data and email-based logins are not automatically imported.
+- If every admin loses their password, recovery requires privileged server/console assistance. The bootstrap lock must not be deleted as an ordinary reset procedure.
+- Local crypto, backend-handler and client logic tests passed. Firebase services were not deployed or tested live; run the pilot checks above before rollout.
+
+References: https://firebase.google.com/docs/auth/admin/create-custom-tokens and https://firebase.google.com/docs/functions/get-started
 
 ## Remaining roadmap
-Final regional headers/workbook baseline; last verified vs last updated; region/platform verification overview; column visibility; actionable summary cards; activity-feed filters; later impact analysis and reminders.
-
-## Members pilot checks
-Sign in as admin and add a disposable PIC. Confirm admin stays signed in, the new member receives the intended region access, and password reset works. Verify Viewer/PIC accounts cannot list members or write profiles directly. Disable the PIC and confirm reads/writes are denied immediately; re-enable to restore access. Self-disable and self-demotion must be rejected. Account creation and profile saving span two Firebase services: if the profile write fails, the app attempts to remove the just-created login and reports recovery details if cleanup fails.
-
-This approach uses standard client email/password account registration in a separate in-memory Auth instance and admin-only Firestore access approval. It does not require Cloud Functions or a Blaze upgrade. Account creation endpoints still accept registration attempts, but unapproved accounts have no tracker data access. Existing-login UID/email matching is an administrator responsibility. Do not disable the Firebase client sign-up API if you want in-tool Add member to work.
+Final regional headers/baseline; verified dates/status overview; additional table controls; activity-feed filters; later impact analysis/reminders.
