@@ -75,3 +75,10 @@ References: https://firebase.google.com/docs/auth/admin/create-custom-tokens and
 
 ## Remaining roadmap
 Final regional headers/baseline; verified dates/status overview; additional table controls; activity-feed filters; later impact analysis/reminders.
+
+## Familiar GitHub layout and Pages
+The frontend now uses root `index.html` plus adjacent JS/CSS files, matching the Checklist and GovernanceHub repositories. Firebase Hosting can serve the same root files; its ignore list excludes the backend, tests and setup documents.
+
+For GitHub Pages, repository Settings → Pages must be enabled separately. A private repository requires a GitHub plan that supports Pages for private repositories. Do not make the repository public as a workaround without deciding to expose the source. If available, choose GitHub Actions and use the supplied **Deploy frontend to GitHub Pages** workflow under Actions → Run workflow. It packages only frontend assets and keeps backend files out of the published artifact.
+
+GitHub Pages hosts the frontend only. It cannot run `functions/`. Username login, first-admin setup and member management still require the secure backend deployment described above. Enabling Pages alone produces a login screen, not a working shared tracker. No change has been made to Checklist/GovernanceHub or their Firebase projects.
