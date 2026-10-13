@@ -49,9 +49,12 @@ Admin → Members → Add member: name, username, initial password, role, region
 - Save a small test commission and confirm another browser/device sees it.
 - Two concurrent previews should reject the stale save.
 - Verify disable/reset triggers a new login in an open member browser.
-- Validate bulk templates, category IDs, future dates and blank/N/A/[CLEAR] behavior.
+- Validate bulk templates, full category-path matching, future dates and blank/N/A/[CLEAR] behavior.
 
 Local logic and password-hashing tests passed. Live Firebase and Pages testing remains pending your console configuration and hosting choice.
 
 ## Deferred work
 PIC-confirmed regional headers/baseline; verification dates/status matrix; table controls; feed filters; later impact analysis/reminders. Secure authorization requires replacing this browser-side model later.
+
+## Regional upload templates
+Malaysia template follows the provided Country/Channel/Cat Level 1–3 structure, fee/VAT flag pairs, VAT, Supporting Links and Additional Supporting Links. No extra Category ID column is shown. Bulk updates match existing Country + Channel + full category hierarchy; old templates containing Category ID remain accepted and validated. Excel uploads read supporting references from each row, including hyperlink targets, and have no separate reference form field. Blank link cells preserve existing references; [CLEAR] removes one. Reference-only updates are shown in preview/history.
