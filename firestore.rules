@@ -3,7 +3,7 @@ service cloud.firestore {
  match /databases/{database}/documents {
   function signedIn() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password'; }
   function member() { return get(/databases/$(database)/documents/commissionMembers/$(request.auth.uid)); }
-  function active() { return signedIn() && member().data.active == true; }
+  function active() { return signedIn() && member().data.active == true && member().data.mustChangePassword != true; }
   function admin() { return active() && member().data.role == 'admin'; }
   match /commissionMembers/{uid} {
    allow get: if signedIn() && (request.auth.uid == uid || admin());
