@@ -1,44 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password'; }
-    function member() { return get(/databases/$(database)/documents/commissionMembers/$(request.auth.uid)); }
-    function active() { return signedIn() && member().data.active == true; }
-    function admin() { return active() && member().data.role == 'admin'; }
-    function assigned(region) { return active() && (member().data.role == 'admin' || (member().data.role == 'pic' && region in member().data.regions)); }
-    function validRegion(region) { return region in ['PH','MY','SG','TH','VN','ID']; }
-
-    // Server-trusted membership records, keyed by Firebase Authentication UID.
-    // Bootstrap the first admin using Firebase Console/Admin SDK, never client code.
-    match /commissionMembers/{uid} {
-      allow read: if active() || (signedIn() && request.auth.uid == uid);
-      allow create, update, delete: if admin();
-    }
-
-    // Immutable event records. Region must be top-level and patch region must agree.
-    // Clients must write one event per category; cross-region writes are denied.
-    match /commissionPilotEvents/{eventId} {
-      allow read: if active();
-      allow create: if assigned(request.resource.data.region)
-        && validRegion(request.resource.data.region)
-        && request.resource.data.patch.region == request.resource.data.region
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.keys().hasAll(['batchId','region','patch','changes','uid','seq','inputDate','effectiveDate']);
-      allow update, delete: if false;
-    }
-
-    match /commissionPilotMeta/{id} {
-      allow read: if active();
-      allow create, update: if id == 'revision' ? admin()
-        : (id.matches('verification-(PH|MY|SG|TH|VN|ID)')
-           && assigned(request.resource.data.region)
-           && id == 'verification-' + request.resource.data.region);
-      allow delete: if false;
-    }
-
-    // Legacy browser-password records must not remain readable.
-    match /commissionPilotUsers/{id} { allow read, write: if false; }
-    match /commissionPilotCredentials/{id} { allow read, write: if false; }
+    function pilot() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'anonymous'; }
+    // Basic pilot gate only: browser-side roles cannot enforce database authorization.
+    // Anyone who obtains an anonymous session can bypass the UI. Scope stays isolated.
+    match /commissionPilotUsers/{id} { allow read, create, update: if pilot(); allow delete: if false; }
+    match /commissionPilotCredentials/{id} { allow read, create, update: if pilot(); allow delete: if false; }
+    match /commissionPilotEvents/{id} { allow read, create: if pilot(); allow update, delete: if false; }
+    match /commissionPilotMeta/{id} { allow read, create, update: if pilot(); allow delete: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }
