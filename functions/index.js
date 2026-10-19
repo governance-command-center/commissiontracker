@@ -89,11 +89,10 @@ exports.updateCommissionMember=onCall({region:'asia-southeast1'},async request=>
 });
 exports.completeCommissionPasswordChange=onCall({region:'asia-southeast1'},async request=>{
  const uid=request.auth?.uid,p=await member(uid);
- if(p.mustChangePassword!==true)return {ok:true};
- // Client must have recently reauthenticated; only accepts an auth token minted after the password update.
- // Require an explicit post-password-change fresh sign-in before clearing the flag.
- const changed=await admin.auth().getUser(uid);
- if(!changed.passwordHash)throw new HttpsError('failed-precondition','Password account required.');
+ if(p.mustChangePassword!==true)throw new HttpsError('failed-precondition','No temporary password change is required.');
+ const password=temporaryPassword(request.data?.newPassword);
+ await admin.auth().updateUser(uid,{password});
  await db.collection('commissionMembers').doc(uid).update({mustChangePassword:false,updatedAt:admin.firestore.FieldValue.serverTimestamp()});
- return {ok:true};
+ await admin.auth().revokeRefreshTokens(uid);
+ return {ok:true,requiresSignIn:true};
 });
