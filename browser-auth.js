@@ -1,8 +1,3 @@
-// Basic browser-side access gate; this is not server-enforced authorization.
-// This initial admin password is visible in source. Change it after first login.
-export const ADMIN_USERNAME='admin';
-export const INITIAL_ADMIN_PASSWORD='commission-admin-2026';
+// Username and profile validation helpers. Authentication is handled by Firebase.
 export function normalizeUsername(value){const name=String(value||'').trim().toLowerCase();if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(name))throw Error('Use a username with 3–32 letters, numbers, dots, dashes or underscores.');return name;}
 export function memberFields(input){const name=String(input.name||'').trim(),role=input.role,regions=[...new Set(input.regions||[])];if(!name||name.length>100||!['admin','pic','viewer'].includes(role)||regions.some(r=>!['SG','MY','PH','TH','VN','ID'].includes(r))||typeof input.active!=='boolean')throw Error('Enter a name, role and valid regions.');if(role==='pic'&&!regions.length)throw Error('Assign at least one region.');return {name,role,active:input.active,regions:role==='admin'?['SG','MY','PH','TH','VN','ID']:role==='viewer'?[]:regions};}
-export async function passwordHash(password,salt){if(typeof password!=='string'||password.length<12||password.length>128)throw Error('Use a password with 12–128 characters.');salt??=Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:310000,hash:'SHA-256'},key,256);return {salt,hash:Array.from(new Uint8Array(bits),b=>b.toString(16).padStart(2,'0')).join('')};}
-export async function passwordMatches(password,credential){if(!credential)return false;try{return (await passwordHash(password,credential.salt)).hash===credential.hash;}catch{return false;}}

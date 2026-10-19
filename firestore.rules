@@ -1,13 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
-    function pilot() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'anonymous'; }
-    // Basic pilot gate only: browser-side roles cannot enforce database authorization.
-    // Anyone who obtains an anonymous session can bypass the UI. Scope stays isolated.
-    match /commissionPilotUsers/{id} { allow read, create, update: if pilot(); allow delete: if false; }
-    match /commissionPilotCredentials/{id} { allow read, create, update: if pilot(); allow delete: if false; }
-    match /commissionPilotEvents/{id} { allow read, create: if pilot(); allow update, delete: if false; }
-    match /commissionPilotMeta/{id} { allow read, create, update: if pilot(); allow delete: if false; }
-    match /{document=**} { allow read, write: if false; }
+ match /databases/{database}/documents {
+  function signedIn() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password'; }
+  function member() { return get(/databases/$(database)/documents/commissionMembers/$(request.auth.uid)); }
+  function active() { return signedIn() && member().data.active == true && member().data.mustChangePassword != true; }
+  function admin() { return active() && member().data.role == 'admin'; }
+  match /commissionMembers/{uid} {
+   allow get: if signedIn() && (request.auth.uid == uid || admin());
+   allow list: if admin();
+   allow create, delete: if false;
+   allow update: if admin()
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','role','regions','active','updatedAt'])
+     && request.resource.data.role in ['admin','pic','viewer']
+     && request.resource.data.regions is list
+     && request.resource.data.active is bool
+     && !(uid == request.auth.uid && (request.resource.data.role != 'admin' || request.resource.data.active != true));
   }
+  match /commissionPilotEvents/{id} { allow read: if active(); allow write: if false; }
+  match /commissionPilotMeta/{id} { allow read: if active(); allow write: if false; }
+  match /commissionPilotUsers/{id} { allow read, write: if false; }
+  match /commissionPilotCredentials/{id} { allow read, write: if false; }
+  match /{document=**} { allow read, write: if false; }
+ }
 }
