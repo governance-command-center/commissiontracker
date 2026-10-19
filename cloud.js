@@ -36,7 +36,7 @@ function requireAdmin(){if(!cloud.ready||profile?.role!=='admin'||!profile.activ
 cloud.addMember=async input=>{requireAdmin();return (await httpsCallable(functions,'createCommissionMember')(input)).data;};
 cloud.updateMember=async(uid,input)=>{requireAdmin();await httpsCallable(functions,'updateCommissionMember')({uid,input});};
 cloud.resetMember=async(member,password)=>{requireAdmin();await httpsCallable(functions,'resetCommissionMemberPassword')({uid:member.uid,password});};
-cloud.changePassword=async(currentPassword,password)=>{if(!auth.currentUser)throw Error('Sign in first.');await reauthenticateWithCredential(auth.currentUser,EmailAuthProvider.credential(auth.currentUser.email,currentPassword));await updatePassword(auth.currentUser,password);cloud.ready=true;cloud.onData?.(null);};
+cloud.changePassword=async(currentPassword,password)=>{if(!auth.currentUser)throw Error('Sign in first.');await reauthenticateWithCredential(auth.currentUser,EmailAuthProvider.credential(auth.currentUser.email,currentPassword));if(profile?.mustChangePassword){await httpsCallable(functions,'completeCommissionPasswordChange')({newPassword:password});cloud.signOut();gate('Password changed. Sign in with your new password.');return;}await updatePassword(auth.currentUser,password);cloud.ready=true;cloud.onData?.(null);};
 cloud.markVerified=async region=>{if(!cloud.canEdit(region))throw Error('Only an authorized PIC or admin can verify this region.');await httpsCallable(functions,'markCommissionVerified')({region});};
 cloud.showPasswordChange=passwordGate;
 window.addEventListener('offline',()=>{cloud.ready=false;cloud.onData?.(null);});
